@@ -76,6 +76,7 @@ class Alphabet extends FlxSpriteGroup
 
 class AlphaCharacter extends FlxSprite
 {
+
     // Mapeo de caracteres especiales a nombres seguros en el XML
     private static var _charMap:Map<String, String> = [
         "á" => "á",
@@ -90,24 +91,39 @@ class AlphaCharacter extends FlxSprite
     {
         super(x, y);
         
-        // Carga el Atlas (Asegúrate de que la ruta a tu PNG y XML sea correcta)
-        frames = FlxAtlasFrames.fromSparrow('assets/shared/images/alphabet.png', 'assets/shared/images/alphabet.xml');
+        // Build / retrieve the atlas when this glyph is created.  Keeping a
+        // static FlxAtlasFrames reference can retain an invalid graphic after
+        // a state has been destroyed, which made every Freeplay glyph invisible
+        // on returning from a song.
+        frames = FlxAtlasFrames.fromSparrow(
+            'assets/shared/images/alphabet.png',
+            'assets/shared/images/alphabet.xml'
+        );
 
-        var animType:String = "lowercase";
+        var animType:String = "normal";
         if (isBold)
         {
             animType = "bold";
         }
-        else if (char == char.toUpperCase() && char != char.toLowerCase())
+        else if (char != char.toLowerCase())
         {
             animType = "uppercase";
         }
 
-        var charKey:String = _charMap.exists(char) ? _charMap.get(char) : char;
+        else if (char != char.toUpperCase())
+        {
+            animType = "lowercase";
+        }
 
-// Por esto (el formato correcto de tu XML):
+        var charKey:String = _charMap.exists(char) ? _charMap.get(char) : char;
+        charKey = char.toLowerCase();
+
+        // The glyph names finish with "10000", but that number is part of the
+        // exported name (not an animation frame index). `addByPrefix` attempts
+        // to parse it as a frame number and fills the log every time Freeplay
+        // rebuilds its labels. Select this exact atlas frame instead.
         var animName:String = charKey + " " + animType + " instance 10000";
-        animation.addByPrefix('idle', animName, 24, true);
+        animation.addByNames('idle', [animName], 24, true);
         animation.play('idle');
         
         if (animation.curAnim == null)

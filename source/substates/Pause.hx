@@ -4,13 +4,12 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxSubState;
 import flixel.group.FlxGroup.FlxTypedGroup;
+import flixel.text.FlxText;
 import states.FreePlayState;
-import states.PsychPlayState;
-import utils.Alphabet;
 
 class Pause extends FlxSubState
 {
-    var grpMenuShit:FlxTypedGroup<Alphabet>;
+    var grpMenuShit:FlxTypedGroup<FlxText>;
     var menuItems:Array<String> = ['RESUME', 'RESTART', 'EXIT'];
     var curSelected:Int = 0;
 
@@ -24,12 +23,13 @@ class Pause extends FlxSubState
         bg.alpha = 0.6;
         add(bg);
 
-        grpMenuShit = new FlxTypedGroup<Alphabet>();
+        grpMenuShit = new FlxTypedGroup<FlxText>();
         add(grpMenuShit);
 
         for (i in 0...menuItems.length)
         {
-            var item:Alphabet = new Alphabet(80, 200 + (i * 120), menuItems[i], true, 1.0);
+            var item = new FlxText(80, 200 + (i * 120), 0, menuItems[i], 48);
+            item.setFormat('assets/fonts/vcr.ttf', 48, 0xFFFFFFFF);
             item.ID = i;
             grpMenuShit.add(item);
         }
@@ -76,7 +76,7 @@ class Pause extends FlxSubState
         if (curSelected >= menuItems.length)
             curSelected = 0;
 
-        grpMenuShit.forEach(function(item:Alphabet)
+        grpMenuShit.forEach(function(item:FlxText)
         {
             if (item.ID == curSelected)
             {
