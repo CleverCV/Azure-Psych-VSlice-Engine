@@ -2,6 +2,7 @@ package states;
 
 import PlayState;
 import flixel.FlxG;
+import flixel.FlxObject;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.group.FlxGroup.FlxTypedGroup;
@@ -27,6 +28,7 @@ class FreePlayState extends FlxState
 
 	var grpSongs:FlxTypedGroup<Alphabet>;
     var curSelected:Int = 0;
+	var cameraTarget:FlxObject;
 
 	#if mobile
 	var _virtualPad:FlxVirtualPad;
@@ -36,13 +38,19 @@ class FreePlayState extends FlxState
     {
         super.create();
 
+		// Usamos la cámara principal: así Alphabet conserva su renderizado normal.
+		cameraTarget = new FlxObject();
+		FlxG.camera.follow(cameraTarget, LOCKON, 0.12);
+
         songs = loadSongList();
 
         _bg = new FlxSprite(0, 0, "assets/shared/images/backgrounds/bg_yellow.png");
+		_bg.scrollFactor.set();
         add(_bg);
 
 		var titleText = new Alphabet(0, 20, "FREEPLAY MENU", true, 1.0);
 		titleText.screenCenter(X);
+		titleText.scrollFactor.set();
         add(titleText);
 
 		grpSongs = new FlxTypedGroup<Alphabet>();
@@ -61,6 +69,7 @@ class FreePlayState extends FlxState
 		{
 			var noSongsText = new Alphabet(0, 180, "NO SONGS FOUND", true, 0.8);
 			noSongsText.screenCenter(X);
+			noSongsText.scrollFactor.set();
 			add(noSongsText);
 		}
 
@@ -180,7 +189,11 @@ class FreePlayState extends FlxState
 				alphb.alpha = 0.6;
 				alphb.x = 120; 
             }
-        });
+		});
+
+		var selected = grpSongs.members[curSelected];
+		if (selected != null)
+			cameraTarget.setPosition(FlxG.width / 2, selected.y + selected.height / 2);
     }
 
     /**

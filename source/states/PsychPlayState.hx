@@ -2,6 +2,8 @@ package states;
 
 import Note;
 import flixel.FlxG;
+import flixel.FlxCamera;
+import flixel.FlxObject;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.graphics.frames.FlxAtlasFrames;
@@ -9,6 +11,9 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.sound.FlxSound;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
+import objects.Enemy;
+import objects.Character;
+import objects.Player;
 import substates.Pause;
 #if mobile
 import flixel.group.FlxSpriteGroup;
@@ -32,7 +37,12 @@ class PsychPlayState extends FlxState
 	var psychparsr:FlxText;
 
 
-	var vocals:FlxSound;
+    var vocals:FlxSound;
+	var player:Null<Player>;
+	var enemy:Null<Enemy>;
+	var cameraTarget:FlxObject;
+	var camGame:FlxCamera;
+	var camHUD:FlxCamera;
 
 	#if mobile
 	var hitboxGroup:FlxSpriteGroup;
@@ -51,7 +61,12 @@ class PsychPlayState extends FlxState
 
     override public function create():Void
     {
-        super.create();
+		super.create();
+		camGame = new FlxCamera();
+		camHUD = new FlxCamera();
+		camHUD.bgColor.alpha = 0;
+		FlxG.cameras.reset(camGame);
+		FlxG.cameras.add(camHUD, false);
 
 		psychparsr = new FlxText(10, FlxG.height - 54, 0, "PsychEngine Parser Indev 1.7", 16);
 		psychparsr.font = "assets/fonts/vcr.ttf";
@@ -59,12 +74,31 @@ class PsychPlayState extends FlxState
 		psychparsr.setFormat(psychparsr.font, 18, FlxColor.WHITE, LEFT);
 		psychparsr.setBorderStyle(FlxTextBorderStyle.OUTLINE, FlxColor.BLACK, 1.5);
 		psychparsr.antialiasing = true;
+		psychparsr.cameras = [camHUD];
 		add(psychparsr);
+
+		// Psych define los IDs de personaje directamente en el chart.
+		if (chartData != null && Reflect.hasField(chartData, "player1"))
+		{
+			player = new Player(0, 0, Std.string(Reflect.field(chartData, "player1")));
+			add(player);
+		}
+		if (chartData != null && Reflect.hasField(chartData, "player2"))
+		{
+			enemy = new Enemy(0, 0, Std.string(Reflect.field(chartData, "player2")));
+			add(enemy);
+		}
+		cameraTarget = new FlxObject();
+		camGame.follow(cameraTarget, LOCKON, 0.04);
+		if (enemy != null) focusCamera(enemy) else if (player != null) focusCamera(player);
 
 
         playerStrums = new FlxTypedGroup<FlxSprite>();
         enemyStrums = new FlxTypedGroup<FlxSprite>();
         grpNotes = new FlxTypedGroup<Note>();
+		playerStrums.cameras = [camHUD];
+		enemyStrums.cameras = [camHUD];
+		grpNotes.cameras = [camHUD];
 
         for (i in 0...4) {
             var enemyArrow = new FlxSprite(100 + (i * 110), 50);
@@ -131,6 +165,7 @@ class PsychPlayState extends FlxState
 	{
 		hitboxGroup = new FlxSpriteGroup();
 		hitboxGroup.scrollFactor.set();
+		hitboxGroup.cameras = [camHUD];
 
 		var widthButton:Int = Std.int(FlxG.width / 4);
 		var heightButton:Int = FlxG.height;
@@ -159,6 +194,7 @@ class PsychPlayState extends FlxState
 		add(hitboxGroup);
 
 		pauseButton = new FlxButton(FlxG.width - 100, 15);
+		pauseButton.cameras = [camHUD];
 		pauseButton.makeGraphic(80, 80, 0xAA000000); 
 
 		var pauseText = new FlxText(0, 15, 80, "||", 32);
@@ -251,6 +287,7 @@ class PsychPlayState extends FlxState
 						{
 							enemyStrum.animation.play('static', true);
 						}
+						if (enemy != null) { enemy.playAnim(['singLEFT', 'singDOWN', 'singUP', 'singRIGHT'][daNote.noteData], true); focusCamera(enemy); }
 
 						if (daNote.sustainLength > 0)
 						{
@@ -339,6 +376,7 @@ class PsychPlayState extends FlxState
 					if (daNote.mustHit && daNote.noteData == i && !daNote.isSustainNote)
 					{
                         if (Math.abs(daNote.strumTime - songTime) < 150) {
+							if (player != null) { player.playAnim(['singLEFT', 'singDOWN', 'singUP', 'singRIGHT'][i], true); focusCamera(player); }
 							if (daNote.sustainLength > 0)
 							{
 								daNote.wasPressed = true;
@@ -392,7 +430,7 @@ class PsychPlayState extends FlxState
 		if (vocals != null)
 			vocals.pause();
 
-		openSubState(new Pause());
+		openSubState(new Pause(camHUD));
 	}
 
 	override public function closeSubState():Void
@@ -480,6 +518,15 @@ class PsychPlayState extends FlxState
 				return 1 * order;
             return 0;
 		});
+	}
+
+	function focusCamera(character:Character):Void
+	{
+		if (cameraTarget == null) return;
+		cameraTarget.setPosition(
+			character.x + character.width / 2 + character.cameraOffset[0],
+			character.y + character.height / 2 + character.cameraOffset[1]
+		);
 	}
 
 	override public function destroy():Void

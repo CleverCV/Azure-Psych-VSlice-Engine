@@ -41,6 +41,9 @@
     <haxelib name="flixel-addons" />
     
     <haxelib name="flixel-ui" />
+    <!-- Runtime HScript interpreter for mod events/scripts. Install with: haxelib install hscript -->
+    <haxelib name="hscript" />
+    <haxedef name="hscript" />
 
     <!--In case you want to use nape with flixel-->
     <!--<haxelib name="nape-haxe4" />-->

@@ -2,6 +2,8 @@ package states;
 
 import Note;
 import flixel.FlxG;
+import flixel.FlxCamera;
+import flixel.FlxObject;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.graphics.frames.FlxAtlasFrames;
@@ -10,7 +12,15 @@ import flixel.sound.FlxSound;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 import openfl.media.Sound;
+import openfl.display.BitmapData;
+import objects.Enemy;
+import objects.Character;
+import objects.Player;
 import substates.Pause;
+#if sys
+import sys.FileSystem;
+import sys.io.File;
+#end
 #if mobile
 import flixel.group.FlxSpriteGroup;
 import flixel.ui.FlxButton;
@@ -32,6 +42,14 @@ class VSlicePlayState extends FlxState
 
 	var psychparsr:FlxText;
 	var vocals:FlxSound;
+	var player:Null<Player>;
+	var enemy:Null<Enemy>;
+	var cameraTarget:FlxObject;
+	var camGame:FlxCamera;
+	var camHUD:FlxCamera;
+	var noteFrames:FlxAtlasFrames;
+	var chartEvents:Array<Dynamic> = [];
+	var nextEvent:Int = 0;
 
 	#if mobile
 	var hitboxGroup:FlxSpriteGroup;
@@ -51,6 +69,11 @@ class VSlicePlayState extends FlxState
 	override public function create():Void
 	{
 		super.create();
+		camGame = new FlxCamera();
+		camHUD = new FlxCamera();
+		camHUD.bgColor.alpha = 0;
+		FlxG.cameras.reset(camGame);
+		FlxG.cameras.add(camHUD, false);
 
 		psychparsr = new FlxText(10, FlxG.height - 54, 0, "VSlice Parser Indev 1.7", 16);
 		psychparsr.font = "assets/fonts/vcr.ttf";
@@ -58,16 +81,46 @@ class VSlicePlayState extends FlxState
 		psychparsr.setFormat(psychparsr.font, 18, FlxColor.WHITE, LEFT);
 		psychparsr.setBorderStyle(FlxTextBorderStyle.OUTLINE, FlxColor.BLACK, 1.5);
 		psychparsr.antialiasing = true;
+		psychparsr.cameras = [camHUD];
 		add(psychparsr);
+		loadStageProps();
+
+		// El parser coloca aquí los personajes de playData.characters del metadata V-Slice.
+		if (chartData != null && chartData.characters != null && chartData.characters.player != null)
+		{
+			var position = stagePosition("bf");
+			player = new Player(position[0], position[1], Std.string(chartData.characters.player));
+			add(player);
+		}
+		if (chartData != null && chartData.characters != null && chartData.characters.opponent != null)
+		{
+			var position = stagePosition("dad");
+			enemy = new Enemy(position[0], position[1], Std.string(chartData.characters.opponent));
+			add(enemy);
+		}
+		cameraTarget = new FlxObject();
+		if (chartData != null && chartData.stageData != null && chartData.stageData.cameraZoom != null)
+			camGame.zoom = Std.parseFloat(Std.string(chartData.stageData.cameraZoom));
+		camGame.follow(cameraTarget, LOCKON, 0.04);
+		if (enemy != null) focusCamera(enemy, "dad") else if (player != null) focusCamera(player, "bf");
 
 		playerStrums = new FlxTypedGroup<FlxSprite>();
 		enemyStrums = new FlxTypedGroup<FlxSprite>();
 		grpNotes = new FlxTypedGroup<Note>();
+		playerStrums.cameras = [camHUD];
+		enemyStrums.cameras = [camHUD];
+		grpNotes.cameras = [camHUD];
+		noteFrames = loadNoteFrames();
+		if (chartData != null && chartData.events != null)
+		{
+			chartEvents = cast chartData.events;
+			chartEvents.sort(function(a:Dynamic, b:Dynamic):Int return Reflect.compare(eventTime(a), eventTime(b)));
+		}
 
 		for (i in 0...4)
 		{
 			var enemyArrow = new FlxSprite(100 + (i * 110), 50);
-			enemyArrow.frames = FlxAtlasFrames.fromSparrow("assets/shared/images/notes/NOTE_assets.png", "assets/shared/images/notes/NOTE_assets.xml");
+			enemyArrow.frames = noteFrames;
 			enemyArrow.animation.addByPrefix('static', strumsData[i] + '0');
 			enemyArrow.animation.play('static');
 			enemyArrow.setGraphicSize(Std.int(enemyArrow.width * 0.7));
@@ -76,7 +129,7 @@ class VSlicePlayState extends FlxState
 			enemyStrums.add(enemyArrow);
 
 			var playerArrow = new FlxSprite(700 + (i * 110), 50);
-			playerArrow.frames = FlxAtlasFrames.fromSparrow("assets/shared/images/notes/NOTE_assets.png", "assets/shared/images/notes/NOTE_assets.xml");
+			playerArrow.frames = noteFrames;
 			playerArrow.animation.addByPrefix('static', strumsData[i] + '0');
 			playerArrow.animation.addByPrefix('press', pressAnims[i]);
 			playerArrow.animation.play('static');
@@ -94,7 +147,7 @@ class VSlicePlayState extends FlxState
 
 		var nombreCancion:String = StringTools.replace(PlayState.currentSong.toLowerCase(), " ", "-");
 		var rutaInst:String = resolveAudioPath(nombreCancion, "Inst");
-		var rutaVoces:String = resolveAudioPath(nombreCancion, "Voices");
+		var rutaVoces:String = resolveVoiceAudioPath(nombreCancion);
 		trace("Ruta de la Inst: " + rutaInst);
 		trace("Ruta de las Voces: " + rutaVoces);
 
@@ -170,6 +223,7 @@ class VSlicePlayState extends FlxState
 	{
 		hitboxGroup = new FlxSpriteGroup();
 		hitboxGroup.scrollFactor.set();
+		hitboxGroup.cameras = [camHUD];
 
 		var widthButton:Int = Std.int(FlxG.width / 4);
 		var heightButton:Int = FlxG.height;
@@ -198,6 +252,7 @@ class VSlicePlayState extends FlxState
 		add(hitboxGroup);
 
 		pauseButton = new FlxButton(FlxG.width - 100, 15);
+		pauseButton.cameras = [camHUD];
 		pauseButton.makeGraphic(80, 80, 0xAA000000);
 
 		var pauseText = new FlxText(0, 15, 80, "||", 32);
@@ -232,6 +287,7 @@ class VSlicePlayState extends FlxState
 		{
 			songTime += elapsed * 1000;
 		}
+		processChartEvents();
 
 		grpNotes.forEachAlive(function(daNote:Note)
 		{
@@ -294,6 +350,7 @@ class VSlicePlayState extends FlxState
 						{
 							enemyStrum.animation.play('static', true);
 						}
+						if (enemy != null) { enemy.playAnim(['singLEFT', 'singDOWN', 'singUP', 'singRIGHT'][daNote.noteData], true); focusCamera(enemy, "dad"); }
 
 						if (daNote.sustainLength > 0)
 						{
@@ -384,6 +441,7 @@ class VSlicePlayState extends FlxState
 					{
 						if (Math.abs(daNote.strumTime - songTime) < 150)
 						{
+							if (player != null) { player.playAnim(['singLEFT', 'singDOWN', 'singUP', 'singRIGHT'][i], true); focusCamera(player, "bf"); }
 							if (daNote.sustainLength > 0)
 							{
 								daNote.wasPressed = true;
@@ -437,7 +495,7 @@ class VSlicePlayState extends FlxState
 		if (vocals != null)
 			vocals.pause();
 
-		openSubState(new Pause());
+		openSubState(new Pause(camHUD));
 	}
 
 	override public function closeSubState():Void
@@ -473,7 +531,7 @@ class VSlicePlayState extends FlxState
 			var mustHit:Bool = noteData.mustHit;
 			var sustainLength:Float = noteData.sustainLength != null ? noteData.sustainLength : 0;
 
-			var parentNote = new Note(strumTime, lane, mustHit);
+			var parentNote = new Note(strumTime, lane, mustHit, false, false, noteFrames);
 			parentNote.sustainLength = sustainLength;
 			grpNotes.add(parentNote);
 
@@ -483,7 +541,7 @@ class VSlicePlayState extends FlxState
 				var segments:Int = Std.int(Math.ceil(sustainLength / segmentLength));
 				for (segment in 1...(segments + 1))
 				{
-					var sustain = new Note(strumTime + (segment * segmentLength), lane, mustHit, true, segment == segments);
+					var sustain = new Note(strumTime + (segment * segmentLength), lane, mustHit, true, segment == segments, noteFrames);
 					sustain.parentNote = parentNote;
 					grpNotes.add(sustain);
 				}
@@ -500,6 +558,148 @@ class VSlicePlayState extends FlxState
 		});
 	}
 
+	function loadNoteFrames():FlxAtlasFrames
+	{
+		var style:String = chartData != null && chartData.noteStyle != null ? Std.string(chartData.noteStyle) : "funkin";
+		var root:String = chartData != null && chartData.assetRoot != null ? Std.string(chartData.assetRoot) : "assets";
+		var names = style == "funkin" ? ["NOTE_assets"] : [style, style + "_assets", "NOTE_assets"];
+		var candidates:Array<String> = [];
+		for (name in names)
+		{
+			candidates.push(root + "/images/notes/" + name);
+			candidates.push(root + "/shared/images/notes/" + name);
+			candidates.push("assets/images/notes/" + name);
+			candidates.push("assets/shared/images/notes/" + name);
+		}
+		for (base in candidates)
+		{
+			var png = base + ".png";
+			var xml = base + ".xml";
+			#if sys
+			if (FileSystem.exists(png) && FileSystem.exists(xml))
+				return FlxAtlasFrames.fromSparrow(BitmapData.fromFile(png), Xml.parse(File.getContent(xml)));
+			#end
+			if (openfl.utils.Assets.exists(png) && openfl.utils.Assets.exists(xml))
+				return FlxAtlasFrames.fromSparrow(png, xml);
+		}
+		return FlxAtlasFrames.fromSparrow("assets/shared/images/notes/NOTE_assets.png", "assets/shared/images/notes/NOTE_assets.xml");
+	}
+
+	function stagePosition(role:String):Array<Float>
+	{
+		var stage = chartData != null ? chartData.stageData : null;
+		if (stage != null && stage.characters != null && Reflect.hasField(stage.characters, role))
+		{
+			var definition:Dynamic = Reflect.field(stage.characters, role);
+			if (definition.position != null && Std.isOfType(definition.position, Array))
+			{
+				var position:Array<Dynamic> = cast definition.position;
+				if (position.length >= 2) return [Std.parseFloat(Std.string(position[0])), Std.parseFloat(Std.string(position[1]))];
+			}
+		}
+		return [0, 0];
+	}
+
+	function loadStageProps():Void
+	{
+		var stage:Dynamic = chartData != null ? chartData.stageData : null;
+		if (stage == null || stage.props == null || !Std.isOfType(stage.props, Array)) return;
+		var props:Array<Dynamic> = cast stage.props;
+		props.sort(function(a:Dynamic, b:Dynamic):Int return Reflect.compare(fieldNumber(a, "zIndex", 0), fieldNumber(b, "zIndex", 0)));
+		for (prop in props)
+		{
+			var assetPath = prop != null && prop.assetPath != null ? Std.string(prop.assetPath) : null;
+			var imagePath = assetPath != null ? resolveStageImage(assetPath) : null;
+			if (imagePath == null)
+			{
+				trace("VSlicePlayState: no se encontró background " + assetPath);
+				continue;
+			}
+			var position:Array<Float> = arrayPosition(prop.position);
+			var background = new FlxSprite(position[0], position[1]);
+			#if sys
+			background.loadGraphic(BitmapData.fromFile(imagePath));
+			#else
+			background.loadGraphic(imagePath);
+			#end
+			var scale:Array<Float> = arrayPosition(prop.scale, 1, 1);
+			background.scale.set(scale[0], scale[1]);
+			background.updateHitbox();
+			add(background);
+		}
+	}
+
+	function resolveStageImage(assetPath:String):Null<String>
+	{
+		var root:String = chartData != null && chartData.assetRoot != null ? Std.string(chartData.assetRoot) : "assets";
+		var candidates = [root + "/images/" + assetPath + ".png", root + "/shared/images/" + assetPath + ".png", "assets/images/" + assetPath + ".png", "assets/shared/images/" + assetPath + ".png"];
+		for (path in candidates)
+		{
+			#if sys
+			if (FileSystem.exists(path)) return path;
+			#end
+			if (openfl.utils.Assets.exists(path)) return path;
+		}
+		return null;
+	}
+
+	function processChartEvents():Void
+	{
+		while (nextEvent < chartEvents.length && eventTime(chartEvents[nextEvent]) <= songTime)
+		{
+			runChartEvent(chartEvents[nextEvent]);
+			nextEvent++;
+		}
+	}
+
+	function runChartEvent(event:Dynamic):Void
+	{
+		var name = event != null && event.e != null ? Std.string(event.e) : "";
+		var value:Dynamic = event != null ? event.v : null;
+		switch (name)
+		{
+			case "FocusCamera":
+				var character = value != null && value.char != null ? Std.string(value.char) : "";
+				// Formato V-Slice: 0 jugador, 1 rival.
+				if (character == "0" && player != null) focusCamera(player, "bf");
+				else if (character == "1" && enemy != null) focusCamera(enemy, "dad");
+			default:
+				trace("VSlicePlayState: evento aún no implementado: " + name);
+		}
+	}
+
+	function eventTime(event:Dynamic):Float return event != null && event.t != null ? Std.parseFloat(Std.string(event.t)) : 0;
+	function arrayPosition(value:Dynamic, defaultX:Float = 0, defaultY:Float = 0):Array<Float>
+	{
+		if (Std.isOfType(value, Array) && (cast value:Array<Dynamic>).length >= 2)
+		{
+			var values:Array<Dynamic> = cast value;
+			return [Std.parseFloat(Std.string(values[0])), Std.parseFloat(Std.string(values[1]))];
+		}
+		return [defaultX, defaultY];
+	}
+	function fieldNumber(value:Dynamic, name:String, fallback:Float):Float return value != null && Reflect.hasField(value, name) ? Std.parseFloat(Std.string(Reflect.field(value, name))) : fallback;
+
+	function focusCamera(character:Character, role:String):Void
+	{
+		if (cameraTarget == null) return;
+		var offset = character.cameraOffset.copy();
+		var stage = chartData != null ? chartData.stageData : null;
+		if (stage != null && stage.characters != null && Reflect.hasField(stage.characters, role))
+		{
+			var definition:Dynamic = Reflect.field(stage.characters, role);
+			if (definition.cameraOffsets != null && Std.isOfType(definition.cameraOffsets, Array))
+			{
+				var values:Array<Dynamic> = cast definition.cameraOffsets;
+				if (values.length >= 2) offset = [Std.parseFloat(Std.string(values[0])), Std.parseFloat(Std.string(values[1]))];
+			}
+		}
+		// La posición del stage es el ancla inferior/original del frame. El
+		// centro vertical del atlas (frameHeight, normalmente 768) evita que el
+		// cuerpo quede abajo por los frameY negativos del XML.
+		cameraTarget.setPosition(character.x + character.width / 2 + offset[0], character.y + character.height / 2 + offset[1]);
+	}
+
 	override public function destroy():Void
 	{
 		if (vocals != null)
@@ -508,6 +708,31 @@ class VSlicePlayState extends FlxState
 			vocals.destroy();
 		}
 		super.destroy();
+	}
+
+	private function resolveVoiceAudioPath(songId:String):String
+	{
+		var names:Array<String> = [];
+		var variations:Array<String> = chartData != null && chartData.variations != null ? cast chartData.variations : [];
+		var characterIds:Array<String> = [];
+		if (chartData != null && chartData.characters != null)
+		{
+			if (chartData.characters.player != null) characterIds.push(Std.string(chartData.characters.player));
+			if (chartData.characters.opponent != null) characterIds.push(Std.string(chartData.characters.opponent));
+		}
+		for (character in characterIds) for (variation in variations) names.push("Voices-" + character + "-" + variation);
+		for (character in characterIds) names.push("Voices-" + character);
+		for (variation in variations) names.push("Voices-" + variation);
+		names.push("Voices");
+		for (name in names)
+		{
+			var path = resolveAudioPath(songId, name);
+			#if sys
+			if (sys.FileSystem.exists(path)) return path;
+			#end
+			if (openfl.utils.Assets.exists(path)) return path;
+		}
+		return resolveAudioPath(songId, "Voices");
 	}
 
 	private static function resolveAudioPath(songId:String, baseName:String):String

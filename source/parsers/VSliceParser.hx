@@ -66,12 +66,22 @@ class VSliceParser
 				if (idx >= 0) audioBase = chartPath.substr(0, idx);
 			}
 
+			var metadata:Dynamic = readMetadata(songId, chartPath);
+			var stageId:String = metadata != null && Reflect.hasField(metadata, "playData") && Reflect.hasField(Reflect.field(metadata, "playData"), "stage")
+				? Std.string(Reflect.field(Reflect.field(metadata, "playData"), "stage")) : null;
 			return {
 				song: songName,
 				speed: getScrollSpeed(rawChart, selectedDifficulty),
 				notes: notes,
 				events: Reflect.hasField(rawChart, "events") ? Reflect.field(rawChart, "events") : [],
-				basePath: audioBase
+				basePath: audioBase,
+				// V-Slice define los personajes fuera del chart, en metadata.playData.
+				characters: extractCharacters(metadata),
+				variations: extractVariations(metadata),
+				noteStyle: extractNoteStyle(metadata),
+				stage: stageId,
+				stageData: stageId != null ? readStage(stageId, chartPath) : null,
+				assetRoot: contentRootFromChart(chartPath)
 			};
 		}
 		catch (error:Dynamic)
@@ -184,6 +194,78 @@ class VSliceParser
 		#else
 		return false;
 		#end
+	}
+
+	/** Lee el metadata V-Slice asociado al chart, si existe. */
+	static function readMetadata(songId:String, chartPath:String):Dynamic
+	{
+		var slash = chartPath.lastIndexOf("/");
+		var folder = slash >= 0 ? chartPath.substr(0, slash) : "";
+		var candidates = [
+			folder + "/" + songId + "-metadata.json",
+			folder + "/metadata.json",
+			"assets/data/songs/" + songId + "/" + songId + "-metadata.json"
+		];
+		for (path in candidates)
+		{
+			if (!chartExists(path)) continue;
+			try
+			{
+				return Json.parse(readChartText(path));
+			}
+			catch (error:Dynamic)
+			{
+				trace("VSliceParser: metadata inválido " + path + ": " + error);
+			}
+		}
+		return null;
+	}
+
+	static function extractCharacters(metadata:Dynamic):Dynamic
+	{
+		if (metadata == null || !Reflect.hasField(metadata, "playData")) return null;
+		var playData:Dynamic = Reflect.field(metadata, "playData");
+		return playData != null && Reflect.hasField(playData, "characters") ? Reflect.field(playData, "characters") : null;
+	}
+
+	static function extractVariations(metadata:Dynamic):Array<String>
+	{
+		var result:Array<String> = [];
+		if (metadata == null || !Reflect.hasField(metadata, "playData")) return result;
+		var playData:Dynamic = Reflect.field(metadata, "playData");
+		var values:Dynamic = playData != null && Reflect.hasField(playData, "songVariations") ? Reflect.field(playData, "songVariations") : null;
+		if (Std.isOfType(values, Array)) for (value in (cast values:Array<Dynamic>)) result.push(Std.string(value));
+		return result;
+	}
+
+	static function extractNoteStyle(metadata:Dynamic):String
+	{
+		if (metadata == null || !Reflect.hasField(metadata, "playData")) return "funkin";
+		var playData:Dynamic = Reflect.field(metadata, "playData");
+		return playData != null && Reflect.hasField(playData, "noteStyle") ? Std.string(Reflect.field(playData, "noteStyle")) : "funkin";
+	}
+
+	static function readStage(stageId:String, chartPath:String):Dynamic
+	{
+		var root = contentRootFromChart(chartPath);
+		var path = root + "/data/stages/" + stageId + ".json";
+		if (!chartExists(path)) return null;
+		try
+		{
+			return Json.parse(readChartText(path));
+		}
+		catch (error:Dynamic)
+		{
+			trace("VSliceParser: stage inválido " + path + ": " + error);
+			return null;
+		}
+	}
+
+	static function contentRootFromChart(chartPath:String):String
+	{
+		var marker = "/data/songs/";
+		var index = chartPath.indexOf(marker);
+		return index >= 0 ? chartPath.substr(0, index) : "assets";
 	}
 
 	static function readChartText(path:String):String

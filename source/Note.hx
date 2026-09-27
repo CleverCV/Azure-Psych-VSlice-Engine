@@ -15,7 +15,7 @@ class Note extends FlxSprite
 	public var sustainLength:Float = 0;
 	public var wasPressed:Bool = false;
 
-	public function new(strumTime:Float, noteData:Int, mustHit:Bool, isSustainNote:Bool = false, isLastSustain:Bool = false)
+	public function new(strumTime:Float, noteData:Int, mustHit:Bool, isSustainNote:Bool = false, isLastSustain:Bool = false, customFrames:FlxAtlasFrames = null)
     {
         super();
         this.strumTime = strumTime;
@@ -23,7 +23,7 @@ class Note extends FlxSprite
         this.mustHit = mustHit;
 		this.isSustainNote = isSustainNote;
 
-        frames = FlxAtlasFrames.fromSparrow(
+		frames = customFrames != null ? customFrames : FlxAtlasFrames.fromSparrow(
             "assets/shared/images/notes/NOTE_assets.png", 
             "assets/shared/images/notes/NOTE_assets.xml"
         );

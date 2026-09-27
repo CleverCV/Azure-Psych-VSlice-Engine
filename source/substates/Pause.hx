@@ -1,6 +1,7 @@
 package substates;
 
 import flixel.FlxG;
+import flixel.FlxCamera;
 import flixel.FlxSprite;
 import flixel.FlxSubState;
 import flixel.group.FlxGroup.FlxTypedGroup;
@@ -15,15 +16,17 @@ class Pause extends FlxSubState
 
     var bg:FlxSprite;
 
-    public function new()
+    public function new(camera:FlxCamera)
     {
         super();
 
         bg = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, 0xFF000000);
         bg.alpha = 0.6;
+		bg.cameras = [camera];
         add(bg);
 
         grpMenuShit = new FlxTypedGroup<FlxText>();
+		grpMenuShit.cameras = [camera];
         add(grpMenuShit);
 
         for (i in 0...menuItems.length)
