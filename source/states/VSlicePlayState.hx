@@ -115,6 +115,9 @@ enemy = new Enemy(
 
 enemy.updateHitbox();
 
+// Ajuste vertical del punto de apoyo del personaje.
+enemy.y -= enemy.height;
+
 add(enemy);
 		}
 		cameraTarget = new FlxObject();
