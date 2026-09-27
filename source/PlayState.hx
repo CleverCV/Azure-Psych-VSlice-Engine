@@ -20,7 +20,7 @@ class PlayState extends FlxState
         {
             trace("Cargando Chart de V-Slice...");
 			var parsedData = VSliceParser.parseChart(currentSong);
-			FlxG.switchState(new VSlicePlayState(parsedData));
+			FlxG.switchState(() -> new VSlicePlayState(parsedData));
         }
         else
         {

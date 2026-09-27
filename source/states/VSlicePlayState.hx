@@ -17,6 +17,9 @@ import objects.Player;
 import openfl.display.BitmapData;
 import openfl.media.Sound;
 import substates.Pause;
+import events.EngineEvent;
+import events.EventDispatcher;
+import events.EventParser;
 #if sys
 import sys.FileSystem;
 import sys.io.File;
@@ -50,6 +53,8 @@ class VSlicePlayState extends FlxState
 	var noteFrames:FlxAtlasFrames;
 	var chartEvents:Array<Dynamic> = [];
 	var nextEvent:Int = 0;
+
+	
 
 	#if mobile
 	var hitboxGroup:FlxSpriteGroup;
@@ -85,6 +90,21 @@ class VSlicePlayState extends FlxState
 		add(psychparsr);
 		loadStageProps();
 
+		// scriptLoader = new HScriptLoader(this);
+
+/*
+if (
+	chartData != null &&
+	chartData.assetRoot != null
+)
+{
+	scriptLoader.loadMod(
+		Std.string(
+			chartData.assetRoot
+		)
+	);
+}
+*/
 		// El parser coloca aquí los personajes de playData.characters del metadata V-Slice.
 		if (chartData != null && chartData.characters != null && chartData.characters.player != null)
 		{
@@ -294,12 +314,13 @@ add(enemy);
 	override public function update(elapsed:Float):Void
 	{
 		if (subState != null)
-		{
-			super.update(elapsed);
-			return;
-		}
+{
+	super.update(elapsed);
+	return;
+}
 
-		super.update(elapsed);
+super.update(elapsed);
+
 
 		if (FlxG.sound.music != null && FlxG.sound.music.playing)
 		{
@@ -673,24 +694,73 @@ add(enemy);
 			nextEvent++;
 		}
 	}
+function runChartEvent(
+	rawEvent:Dynamic
+):Void
+{
+	var events:Array<EngineEvent> =
+		EventParser.parse(rawEvent);
 
-	function runChartEvent(event:Dynamic):Void
+	for (event in events)
 	{
-		var name = event != null && event.e != null ? Std.string(event.e) : "";
-		var value:Dynamic = event != null ? event.v : null;
-		switch (name)
+		if (
+			EventDispatcher.dispatch(
+				event,
+				this
+			)
+		)
 		{
-			case "FocusCamera":
-				var character = value != null && value.char != null ? Std.string(value.char) : "";
-				// Formato V-Slice: 0 jugador, 1 rival.
-				if (character == "0" && player != null) focusCamera(player, "bf");
-				else if (character == "1" && enemy != null) focusCamera(enemy, "dad");
-			default:
-				trace("VSlicePlayState: evento aún no implementado: " + name);
+			continue;
 		}
+
+	
+		
+	}
+}
+
+	function eventTime(
+	event:Dynamic
+):Float
+{
+	if (event == null)
+		return 0;
+
+	if (
+		Reflect.hasField(
+			event,
+			"t"
+		)
+	)
+	{
+		return Std.parseFloat(
+			Std.string(
+				Reflect.field(
+					event,
+					"t"
+				)
+			)
+		);
 	}
 
-	function eventTime(event:Dynamic):Float return event != null && event.t != null ? Std.parseFloat(Std.string(event.t)) : 0;
+	if (
+		Reflect.hasField(
+			event,
+			"time"
+		)
+	)
+	{
+		return Std.parseFloat(
+			Std.string(
+				Reflect.field(
+					event,
+					"time"
+				)
+			)
+		);
+	}
+
+	return 0;
+}
 	function arrayPosition(value:Dynamic, defaultX:Float = 0, defaultY:Float = 0):Array<Float>
 	{
 		if (Std.isOfType(value, Array) && (cast value:Array<Dynamic>).length >= 2)
@@ -753,15 +823,19 @@ add(enemy);
 		cameraTarget.setPosition(cameraX + offsetX, cameraY + offsetY);
 	}
 
-	override public function destroy():Void
-	{
-		if (vocals != null)
-		{
-			vocals.stop();
-			vocals.destroy();
-		}
-		super.destroy();
-	}
+override public function destroy():Void
+{
+    if (vocals != null)
+    {
+        vocals.stop();
+        vocals.destroy();
+    }
+
+
+
+    super.destroy();
+}
+	
 
 	private function resolveVoiceAudioPath(songId:String):String
 	{
