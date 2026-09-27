@@ -13,10 +13,6 @@ import sys.FileSystem;
 
 /**
  * Sprite de personaje compatible con los JSON de Psych Engine y Funkin' V-Slice.
- *
- * El cargador busca primero en mods y después en assets.  Puedes crear, por ejemplo:
- * `new Character(770, 100, "bf")` y colocar el JSON/PNG/XML en cualquiera de las
- * rutas habituales de ambos motores.
  */
 class Character extends FlxSprite
 {
@@ -29,14 +25,14 @@ class Character extends FlxSprite
 		super(x, y);
 		characterId = id;
 		loadCharacter(id);
-		// Ajuste global: todos los personajes quedan 50 px arriba.
-		this.y -= 50;
 	}
 
 	public function loadCharacter(id:String):Bool
 	{
 		characterId = id;
+
 		var jsonPath = findCharacterJson(id);
+
 		if (jsonPath == null)
 		{
 			trace('Character: no se encontró JSON para "' + id + '".');
@@ -48,16 +44,22 @@ class Character extends FlxSprite
 		{
 			var data:Dynamic = Json.parse(readText(jsonPath));
 			var imagePath = findImagePath(id, jsonPath, data);
+
 			if (imagePath == null)
 				throw 'No se encontró PNG/XML para "' + id + '".';
 
 			loadSparrow(imagePath + ".png", imagePath + ".xml");
+
 			readAnimations(data);
 			applyCharacterProperties(data);
 
-			if (animation.exists("idle")) playAnim("idle");
-			else if (animation.getNameList().length > 0) playAnim(animation.getNameList()[0]);
+			if (animation.exists("idle"))
+				playAnim("idle");
+			else if (animation.getNameList().length > 0)
+				playAnim(animation.getNameList()[0]);
+
 			trace('Character: "' + id + '" cargado desde ' + jsonPath);
+
 			return true;
 		}
 		catch (error:Dynamic)
@@ -71,200 +73,572 @@ class Character extends FlxSprite
 	public function playAnim(name:String, force:Bool = false):Void
 	{
 		var key = normalizeAnimationName(name);
-		if (!animation.exists(key)) key = name;
+
+		if (!animation.exists(key))
+			key = name;
+
 		animation.play(key, force);
+
 		var values = animationOffsets.get(key);
-		if (values != null) offset.set(values[0], values[1]); else offset.set();
+
+		if (values != null)
+			offset.set(values[0], values[1]);
+		else
+			offset.set();
 	}
 
 	override public function update(elapsed:Float):Void
 	{
 		super.update(elapsed);
-		// Las animaciones de canto normalmente no hacen loop; al terminar vuelven
-		// al idle sin requerir código especial en cada PlayState.
-		if (animation.curAnim != null && animation.curAnim.finished && animation.curAnim.name != "idle" && animation.exists("idle"))
+
+		if (
+			animation.curAnim != null &&
+			animation.curAnim.finished &&
+			animation.curAnim.name != "idle" &&
+			animation.exists("idle")
+		)
+		{
 			playAnim("idle");
+		}
 	}
 
 	function readAnimations(data:Dynamic):Void
 	{
 		var animations:Dynamic = field(data, "animations");
-		if (!Std.isOfType(animations, Array)) return;
+
+		if (!Std.isOfType(animations, Array))
+			return;
 
 		for (entry in (cast animations:Array<Dynamic>))
 		{
-			if (entry == null) continue;
-			// Psych: anim/name/fps/loop/indices. V-Slice: name/prefix/frameRate/looped.
-			var rawName = stringField(entry, "anim", stringField(entry, "name", "idle"));
-			var prefix = stringField(entry, "prefix", stringField(entry, "name", rawName));
-			if (Reflect.hasField(entry, "anim") && Reflect.hasField(entry, "name"))
+			if (entry == null)
+				continue;
+
+			var rawName = stringField(
+				entry,
+				"anim",
+				stringField(entry, "name", "idle")
+			);
+
+			var prefix = stringField(
+				entry,
+				"prefix",
+				stringField(entry, "name", rawName)
+			);
+
+			if (
+				Reflect.hasField(entry, "anim") &&
+				Reflect.hasField(entry, "name")
+			)
+			{
 				prefix = stringField(entry, "name", rawName);
+			}
 
 			var name = normalizeAnimationName(rawName);
-			var fps = intField(entry, "fps", intField(entry, "frameRate", 24));
-			var loop = boolField(entry, "loop", boolField(entry, "looped", name == "idle"));
+
+			var fps = intField(
+				entry,
+				"fps",
+				intField(entry, "frameRate", 24)
+			);
+
+			var loop = boolField(
+				entry,
+				"loop",
+				boolField(entry, "looped", name == "idle")
+			);
+
 			var flipX = boolField(entry, "flipX", false);
 			var flipY = boolField(entry, "flipY", false);
-			var indices:Dynamic = field(entry, "indices");
-			if (indices == null) indices = field(entry, "frameIndices"); // nombre usado por V-Slice
 
-			if (Std.isOfType(indices, Array) && (cast indices:Array<Dynamic>).length > 0)
+			var indices:Dynamic = field(entry, "indices");
+
+			if (indices == null)
+				indices = field(entry, "frameIndices");
+
+			if (
+				Std.isOfType(indices, Array) &&
+				(cast indices:Array<Dynamic>).length > 0
+			)
 			{
 				var frames:Array<Int> = [];
-				for (index in (cast indices:Array<Dynamic>)) frames.push(Std.int(index));
-				animation.addByIndices(name, prefix, frames, "", fps, loop, flipX, flipY);
+
+				for (index in (cast indices:Array<Dynamic>))
+					frames.push(Std.int(index));
+
+				animation.addByIndices(
+					name,
+					prefix,
+					frames,
+					"",
+					fps,
+					loop,
+					flipX,
+					flipY
+				);
 			}
-			else animation.addByPrefix(name, prefix, fps, loop, flipX, flipY);
+			else
+			{
+				animation.addByPrefix(
+					name,
+					prefix,
+					fps,
+					loop,
+					flipX,
+					flipY
+				);
+			}
 
 			var offsets:Dynamic = field(entry, "offsets");
-			if (Std.isOfType(offsets, Array) && (cast offsets:Array<Dynamic>).length >= 2)
+
+			if (
+				Std.isOfType(offsets, Array) &&
+				(cast offsets:Array<Dynamic>).length >= 2
+			)
 			{
 				var offsetValues:Array<Dynamic> = cast offsets;
-				animationOffsets.set(name, [toFloat(offsetValues[0]), toFloat(offsetValues[1])]);
+
+				animationOffsets.set(
+					name,
+					[
+						toFloat(offsetValues[0]),
+						toFloat(offsetValues[1])
+					]
+				);
 			}
 		}
 	}
 
 	function applyCharacterProperties(data:Dynamic):Void
 	{
-		flipX = boolField(data, "flip_x", boolField(data, "flipX", false));
-		antialiasing = boolField(data, "antialiasing", true);
+		/*
+		 * IMPORTANTE:
+		 *
+		 * La posición del personaje NO se toma del JSON del personaje.
+		 * V-Slice ya proporciona la posición mediante:
+		 *
+		 * stageData.characters.bf.position
+		 * stageData.characters.dad.position
+		 *
+		 * Por eso no sumamos aquí "position".
+		 */
+
+		flipX = boolField(
+			data,
+			"flip_x",
+			boolField(data, "flipX", false)
+		);
+
+		antialiasing = boolField(
+			data,
+			"antialiasing",
+			true
+		);
+
 		var scaleValue:Dynamic = field(data, "scale");
-		if (scaleValue != null && !Std.isOfType(scaleValue, Array)) scale.set(toFloat(scaleValue), toFloat(scaleValue));
+
+		if (
+			scaleValue != null &&
+			!Std.isOfType(scaleValue, Array)
+		)
+		{
+			var scaleNumber = toFloat(scaleValue);
+			scale.set(scaleNumber, scaleNumber);
+		}
 		else if (Std.isOfType(scaleValue, Array))
 		{
 			var values:Array<Dynamic> = cast scaleValue;
-			if (values.length >= 2) scale.set(toFloat(values[0]), toFloat(values[1]));
+
+			if (values.length >= 2)
+			{
+				scale.set(
+					toFloat(values[0]),
+					toFloat(values[1])
+				);
+			}
 		}
-		var position:Dynamic = field(data, "position");
-		if (Std.isOfType(position, Array) && (cast position:Array<Dynamic>).length >= 2)
-		{
-			var positionValues:Array<Dynamic> = cast position;
-			x += toFloat(positionValues[0]);
-			y += toFloat(positionValues[1]);
-		}
-		var cameraPosition:Dynamic = field(data, "camera_position");
-		if (cameraPosition == null) cameraPosition = field(data, "cameraOffsets");
-		if (Std.isOfType(cameraPosition, Array) && (cast cameraPosition:Array<Dynamic>).length >= 2)
+
+		var cameraPosition:Dynamic =
+			field(data, "camera_position");
+
+		if (cameraPosition == null)
+			cameraPosition = field(data, "cameraOffsets");
+
+		if (
+			Std.isOfType(cameraPosition, Array) &&
+			(cast cameraPosition:Array<Dynamic>).length >= 2
+		)
 		{
 			var cameraValues:Array<Dynamic> = cast cameraPosition;
-			cameraOffset = [toFloat(cameraValues[0]), toFloat(cameraValues[1])];
+
+			cameraOffset = [
+				toFloat(cameraValues[0]),
+				toFloat(cameraValues[1])
+			];
 		}
+
 		updateHitbox();
 	}
 
 	function loadSparrow(png:String, xml:String):Void
 	{
 		#if sys
-		if (FileSystem.exists(png) && FileSystem.exists(xml))
+		if (
+			FileSystem.exists(png) &&
+			FileSystem.exists(xml)
+		)
 		{
-			frames = FlxAtlasFrames.fromSparrow(BitmapData.fromFile(png), Xml.parse(File.getContent(xml)));
+			frames = FlxAtlasFrames.fromSparrow(
+				BitmapData.fromFile(png),
+				Xml.parse(File.getContent(xml))
+			);
+
 			return;
 		}
 		#end
-		frames = FlxAtlasFrames.fromSparrow(png, xml);
+
+		frames = FlxAtlasFrames.fromSparrow(
+			png,
+			xml
+		);
 	}
 
 	static function findCharacterJson(id:String):Null<String>
 	{
 		var slug = formatId(id);
 		var ids = [id, slug];
-		var roots = contentRoots();
-		var folders = ["characters", "data/characters", "shared/data/characters", "shared/characters"];
-		for (root in roots) for (folder in folders) for (name in ids)
-		{
-			var path = root + "/" + folder + "/" + name + ".json";
-			if (assetExists(path)) return path;
-		}
-		return null;
-	}
 
-	static function findImagePath(id:String, jsonPath:String, data:Dynamic):Null<String>
-	{
-		var declared = stringField(data, "image", stringField(data, "assetPath", ""));
-		var values = [declared, id, formatId(id)];
 		var roots = contentRoots();
-		var folders = ["images/characters", "characters", "shared/images/characters", "images"];
-		for (value in values)
+
+		var folders = [
+			"characters",
+			"data/characters",
+			"shared/data/characters",
+			"shared/characters"
+		];
+
+		for (root in roots)
 		{
-			if (value == null || value.length == 0) continue;
-			value = removeExtension(value);
-			if (assetExists(value + ".png") && assetExists(value + ".xml")) return value;
-			for (root in roots)
+			for (folder in folders)
 			{
-				// V-Slice suele declarar assetPath como "characters/bf".
-				var directPath = root + "/" + value;
-				if (assetExists(directPath + ".png") && assetExists(directPath + ".xml")) return directPath;
-				// El assetPath de V-Slice es relativo a images/, no a images/characters/.
-				for (imageRoot in [root + "/images", root + "/shared/images"])
+				for (name in ids)
 				{
-					var declaredPath = imageRoot + "/" + value;
-					if (assetExists(declaredPath + ".png") && assetExists(declaredPath + ".xml")) return declaredPath;
-				}
-				for (folder in folders)
-				{
-					var path = root + "/" + folder + "/" + value;
-					if (assetExists(path + ".png") && assetExists(path + ".xml")) return path;
+					var path =
+						root +
+						"/" +
+						folder +
+						"/" +
+						name +
+						".json";
+
+					if (assetExists(path))
+						return path;
 				}
 			}
 		}
+
+		return null;
+	}
+
+	static function findImagePath(
+		id:String,
+		jsonPath:String,
+		data:Dynamic
+	):Null<String>
+	{
+		var declared =
+			stringField(
+				data,
+				"image",
+				stringField(data, "assetPath", "")
+			);
+
+		var values = [
+			declared,
+			id,
+			formatId(id)
+		];
+
+		var roots = contentRoots();
+
+		var folders = [
+			"images/characters",
+			"characters",
+			"shared/images/characters",
+			"images"
+		];
+
+		for (value in values)
+		{
+			if (
+				value == null ||
+				value.length == 0
+			)
+				continue;
+
+			value = removeExtension(value);
+
+			if (
+				assetExists(value + ".png") &&
+				assetExists(value + ".xml")
+			)
+			{
+				return value;
+			}
+
+			for (root in roots)
+			{
+				var directPath =
+					root +
+					"/" +
+					value;
+
+				if (
+					assetExists(directPath + ".png") &&
+					assetExists(directPath + ".xml")
+				)
+				{
+					return directPath;
+				}
+
+				for (
+					imageRoot in [
+						root + "/images",
+						root + "/shared/images"
+					]
+				)
+				{
+					var declaredPath =
+						imageRoot +
+						"/" +
+						value;
+
+					if (
+						assetExists(declaredPath + ".png") &&
+						assetExists(declaredPath + ".xml")
+					)
+					{
+						return declaredPath;
+					}
+				}
+
+				for (folder in folders)
+				{
+					var path =
+						root +
+						"/" +
+						folder +
+						"/" +
+						value;
+
+					if (
+						assetExists(path + ".png") &&
+						assetExists(path + ".xml")
+					)
+					{
+						return path;
+					}
+				}
+			}
+		}
+
 		return null;
 	}
 
 	static function normalizeAnimationName(value:String):String
 	{
 		var key = value.toLowerCase();
-		var first = key.split("_")[0]; // Idle_pepe, singLEFT_bf -> idle, singleft
+		var first = key.split("_")[0];
+
 		return switch (first)
 		{
-			case "idle", "danceleft", "danceright": first;
-			case "left", "singleft": "singLEFT";
-			case "down", "singdown": "singDOWN";
-			case "up", "singup": "singUP";
-			case "right", "singright": "singRIGHT";
-			case "missleft": "singLEFTmiss";
-			case "missdown": "singDOWNmiss";
-			case "missup": "singUPmiss";
-			case "missright": "singRIGHTmiss";
-			default: value;
+			case "idle", "danceleft", "danceright":
+				first;
+
+			case "left", "singleft":
+				"singLEFT";
+
+			case "down", "singdown":
+				"singDOWN";
+
+			case "up", "singup":
+				"singUP";
+
+			case "right", "singright":
+				"singRIGHT";
+
+			case "missleft":
+				"singLEFTmiss";
+
+			case "missdown":
+				"singDOWNmiss";
+
+			case "missup":
+				"singUPmiss";
+
+			case "missright":
+				"singRIGHTmiss";
+
+			default:
+				value;
 		};
 	}
 
 	static function assetExists(path:String):Bool
 	{
-		if (Assets.exists(path)) return true;
-		#if sys return FileSystem.exists(path); #else return false; #end
+		if (Assets.exists(path))
+			return true;
+
+		#if sys
+		return FileSystem.exists(path);
+		#else
+		return false;
+		#end
 	}
 
-	/** Assets empaquetados y cada mod instalado en mods/<nombre-del-mod>. */
 	static function contentRoots():Array<String>
 	{
-		var roots = ["mods", "assets", "assets/shared"];
+		var roots = [
+			"mods",
+			"assets",
+			"assets/shared"
+		];
+
 		#if sys
 		var modFolders = ["mods"];
+
 		#if android
-		var storage = lime.system.System.applicationStorageDirectory;
-		if (storage != null && storage.length > 0) modFolders.unshift(storage + "mods");
+		var storage =
+			lime.system.System.applicationStorageDirectory;
+
+		if (
+			storage != null &&
+			storage.length > 0
+		)
+		{
+			modFolders.unshift(
+				storage + "mods"
+			);
+		}
 		#end
+
 		for (modsRoot in modFolders)
 		{
-			if (!FileSystem.exists(modsRoot) || !FileSystem.isDirectory(modsRoot)) continue;
-			if (roots.indexOf(modsRoot) == -1) roots.unshift(modsRoot);
+			if (
+				!FileSystem.exists(modsRoot) ||
+				!FileSystem.isDirectory(modsRoot)
+			)
+				continue;
+
+			if (roots.indexOf(modsRoot) == -1)
+				roots.unshift(modsRoot);
+
 			for (entry in FileSystem.readDirectory(modsRoot))
 			{
-				var path = modsRoot + "/" + entry;
-				if (FileSystem.isDirectory(path)) roots.unshift(path);
+				var path =
+					modsRoot +
+					"/" +
+					entry;
+
+				if (FileSystem.isDirectory(path))
+					roots.unshift(path);
 			}
 		}
 		#end
+
 		return roots;
 	}
-	static function readText(path:String):String { if (Assets.exists(path)) return Assets.getText(path); #if sys return File.getContent(path); #else throw "Asset no incluido: " + path; #end }
-	static function formatId(value:String):String return value.toLowerCase().split(" ").join("-");
-	static function removeExtension(value:String):String return StringTools.endsWith(value.toLowerCase(), ".png") ? value.substr(0, value.length - 4) : value;
-	static function field(value:Dynamic, name:String):Dynamic return value != null && Reflect.hasField(value, name) ? Reflect.field(value, name) : null;
-	static function stringField(value:Dynamic, name:String, fallback:String):String { var result = field(value, name); return result == null ? fallback : Std.string(result); }
-	static function intField(value:Dynamic, name:String, fallback:Int):Int { var result = field(value, name); return result == null ? fallback : Std.int(result); }
-	static function boolField(value:Dynamic, name:String, fallback:Bool):Bool { var result = field(value, name); return result == null ? fallback : result == true || Std.string(result).toLowerCase() == "true"; }
-	static function toFloat(value:Dynamic):Float { var parsed = Std.parseFloat(Std.string(value)); return Math.isNaN(parsed) ? 0 : parsed; }
+
+	static function readText(path:String):String
+	{
+		if (Assets.exists(path))
+			return Assets.getText(path);
+
+		#if sys
+		return File.getContent(path);
+		#else
+		throw "Asset no incluido: " + path;
+		#end
+	}
+
+	static function formatId(value:String):String
+	{
+		return value
+			.toLowerCase()
+			.split(" ")
+			.join("-");
+	}
+
+	static function removeExtension(value:String):String
+	{
+		return StringTools.endsWith(
+			value.toLowerCase(),
+			".png"
+		)
+			? value.substr(0, value.length - 4)
+			: value;
+	}
+
+	static function field(
+		value:Dynamic,
+		name:String
+	):Dynamic
+	{
+		return value != null &&
+			Reflect.hasField(value, name)
+			? Reflect.field(value, name)
+			: null;
+	}
+
+	static function stringField(
+		value:Dynamic,
+		name:String,
+		fallback:String
+	):String
+	{
+		var result = field(value, name);
+
+		return result == null
+			? fallback
+			: Std.string(result);
+	}
+
+	static function intField(
+		value:Dynamic,
+		name:String,
+		fallback:Int
+	):Int
+	{
+		var result = field(value, name);
+
+		return result == null
+			? fallback
+			: Std.int(result);
+	}
+
+	static function boolField(
+		value:Dynamic,
+		name:String,
+		fallback:Bool
+	):Bool
+	{
+		var result = field(value, name);
+
+		return result == null
+			? fallback
+			: result == true ||
+			  Std.string(result).toLowerCase() == "true";
+	}
+
+	static function toFloat(value:Dynamic):Float
+	{
+		var parsed =
+			Std.parseFloat(
+				Std.string(value)
+			);
+
+		return Math.isNaN(parsed)
+			? 0
+			: parsed;
+	}
 }

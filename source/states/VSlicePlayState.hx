@@ -1,8 +1,8 @@
 package states;
 
 import Note;
-import flixel.FlxG;
 import flixel.FlxCamera;
+import flixel.FlxG;
 import flixel.FlxObject;
 import flixel.FlxSprite;
 import flixel.FlxState;
@@ -11,11 +11,11 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.sound.FlxSound;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
-import openfl.media.Sound;
-import openfl.display.BitmapData;
-import objects.Enemy;
 import objects.Character;
+import objects.Enemy;
 import objects.Player;
+import openfl.display.BitmapData;
+import openfl.media.Sound;
 import substates.Pause;
 #if sys
 import sys.FileSystem;
@@ -89,14 +89,33 @@ class VSlicePlayState extends FlxState
 		if (chartData != null && chartData.characters != null && chartData.characters.player != null)
 		{
 			var position = stagePosition("bf");
-			player = new Player(position[0], position[1], Std.string(chartData.characters.player));
-			add(player);
+
+player = new Player(
+	position[0],
+	position[1],
+	Std.string(chartData.characters.player)
+);
+
+player.updateHitbox();
+
+// V-Slice usa la posición del stage como punto de apoyo inferior.
+player.y -= player.height;
+
+add(player);
 		}
 		if (chartData != null && chartData.characters != null && chartData.characters.opponent != null)
 		{
 			var position = stagePosition("dad");
-			enemy = new Enemy(position[0], position[1], Std.string(chartData.characters.opponent));
-			add(enemy);
+
+enemy = new Enemy(
+	position[0],
+	position[1],
+	Std.string(chartData.characters.opponent)
+);
+
+enemy.updateHitbox();
+
+add(enemy);
 		}
 		cameraTarget = new FlxObject();
 		if (chartData != null && chartData.stageData != null && chartData.stageData.cameraZoom != null)
@@ -682,22 +701,53 @@ class VSlicePlayState extends FlxState
 
 	function focusCamera(character:Character, role:String):Void
 	{
-		if (cameraTarget == null) return;
-		var offset = character.cameraOffset.copy();
-		var stage = chartData != null ? chartData.stageData : null;
+		if (cameraTarget == null || character == null)
+			return;
+
+		var cameraX:Float = character.x + (character.width * 0.5);
+
+		var cameraY:Float = character.y + (character.height * 0.5);
+
+		/*
+		 * Primero usamos el camera offset definido por el
+		 * propio personaje.
+		 */
+		var offsetX:Float = 0;
+		var offsetY:Float = 0;
+
+		if (character.cameraOffset != null && character.cameraOffset.length >= 2)
+		{
+			offsetX = character.cameraOffset[0];
+			offsetY = character.cameraOffset[1];
+		}
+
+		/*
+		 * Después comprobamos los offsets definidos por el
+		 * stage V-Slice.
+		 *
+		 * Esto permite que el stage tenga la última palabra
+		 * sobre dónde mira la cámara.
+		 */
+		var stage:Dynamic = chartData != null ? chartData.stageData : null;
+
 		if (stage != null && stage.characters != null && Reflect.hasField(stage.characters, role))
 		{
 			var definition:Dynamic = Reflect.field(stage.characters, role);
+
 			if (definition.cameraOffsets != null && Std.isOfType(definition.cameraOffsets, Array))
 			{
 				var values:Array<Dynamic> = cast definition.cameraOffsets;
-				if (values.length >= 2) offset = [Std.parseFloat(Std.string(values[0])), Std.parseFloat(Std.string(values[1]))];
+
+				if (values.length >= 2)
+			{
+					offsetX = Std.parseFloat(Std.string(values[0]));
+
+					offsetY = Std.parseFloat(Std.string(values[1]));
 			}
 		}
-		// La posición del stage es el ancla inferior/original del frame. El
-		// centro vertical del atlas (frameHeight, normalmente 768) evita que el
-		// cuerpo quede abajo por los frameY negativos del XML.
-		cameraTarget.setPosition(character.x + character.width / 2 + offset[0], character.y + character.height / 2 + offset[1]);
+		}
+
+		cameraTarget.setPosition(cameraX + offsetX, cameraY + offsetY);
 	}
 
 	override public function destroy():Void
