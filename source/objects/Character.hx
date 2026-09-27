@@ -53,6 +53,11 @@ class Character extends FlxSprite
 			readAnimations(data);
 			applyCharacterProperties(data);
 
+			trace(
+    'Character "' + id +
+    '" flipX JSON = ' + flipX
+);
+
 			if (animation.exists("idle"))
 				playAnim("idle");
 			else if (animation.getNameList().length > 0)

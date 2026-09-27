@@ -10,5 +10,9 @@ class Player extends Character
 	)
 	{
 		super(x, y, id);
+
+		// Los personajes del jugador usan la orientación
+		// invertida respecto a la orientación base del JSON.
+		flipX = !flipX;
 	}
 }
