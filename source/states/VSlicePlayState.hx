@@ -17,9 +17,9 @@ import objects.Player;
 import openfl.display.BitmapData;
 import openfl.media.Sound;
 import substates.Pause;
-import events.EngineEvent;
-import events.EventDispatcher;
-import events.EventParser;
+//import events.EngineEvent;
+//import events.EventDispatcher;
+//import events.EventParser;
 #if sys
 import sys.FileSystem;
 import sys.io.File;
@@ -155,8 +155,8 @@ add(enemy);
 		noteFrames = loadNoteFrames();
 		if (chartData != null && chartData.events != null)
 		{
-			chartEvents = cast chartData.events;
-			chartEvents.sort(function(a:Dynamic, b:Dynamic):Int return Reflect.compare(eventTime(a), eventTime(b)));
+			//chartEvents = cast chartData.events;
+			//chartEvents.sort(function(a:Dynamic, b:Dynamic):Int return Reflect.compare(eventTime(a), eventTime(b)));
 		}
 
 		for (i in 0...4)
@@ -330,7 +330,7 @@ super.update(elapsed);
 		{
 			songTime += elapsed * 1000;
 		}
-		processChartEvents();
+		//	processChartEvents();
 
 		grpNotes.forEachAlive(function(daNote:Note)
 		{
@@ -441,16 +441,16 @@ super.update(elapsed);
 	function handleInputs():Void
 	{
 		var keyboardPressed = [
-			FlxG.keys.anyPressed([LEFT, A]),
-			FlxG.keys.anyPressed([DOWN, S]),
-			FlxG.keys.anyPressed([UP, W]),
-			FlxG.keys.anyPressed([RIGHT, D])
+			FlxG.keys.anyPressed([LEFT, D]),
+			FlxG.keys.anyPressed([DOWN, F]),
+			FlxG.keys.anyPressed([UP, J]),
+			FlxG.keys.anyPressed([RIGHT, K])
 		];
 		var keyboardJustPressed = [
-			FlxG.keys.anyJustPressed([LEFT, A]),
-			FlxG.keys.anyJustPressed([DOWN, S]),
-			FlxG.keys.anyJustPressed([UP, W]),
-			FlxG.keys.anyJustPressed([RIGHT, D])
+			FlxG.keys.anyJustPressed([LEFT, D]),
+			FlxG.keys.anyJustPressed([DOWN, F]),
+			FlxG.keys.anyJustPressed([UP, J]),
+			FlxG.keys.anyJustPressed([RIGHT, K])
 		];
 
 		var keysPressed = [false, false, false, false];
@@ -686,20 +686,21 @@ super.update(elapsed);
 		return null;
 	}
 
-	function processChartEvents():Void
-	{
-		while (nextEvent < chartEvents.length && eventTime(chartEvents[nextEvent]) <= songTime)
-		{
-			runChartEvent(chartEvents[nextEvent]);
-			nextEvent++;
-		}
-	}
-function runChartEvent(
+//	function processChartEvents():Void
+//	{
+		//while (nextEvent < chartEvents.length && eventTime(chartEvents[nextEvent]) <= songTime)
+	//	{
+			//runChartEvent(chartEvents[nextEvent]);
+		//	nextEvent++;
+	//	}
+	//}
+
+	/*function runChartEvent(
 	rawEvent:Dynamic
 ):Void
 {
-	var events:Array<EngineEvent> =
-		EventParser.parse(rawEvent);
+//	var events:Array<EngineEvent> =
+	//	EventParser.parse(rawEvent);
 
 	for (event in events)
 	{
@@ -758,9 +759,8 @@ function runChartEvent(
 			)
 		);
 	}
-
-	return 0;
-}
+	*/
+	// return 0;
 	function arrayPosition(value:Dynamic, defaultX:Float = 0, defaultY:Float = 0):Array<Float>
 	{
 		if (Std.isOfType(value, Array) && (cast value:Array<Dynamic>).length >= 2)

@@ -11,7 +11,7 @@ class Main extends Sprite
 	{
 		super();
 
-		scripting.PolymodTest.run();
+//		scripting.PolymodTest.run();
 
 		var gameWidth:Int = 1280;
 		var gameHeight:Int = 720;

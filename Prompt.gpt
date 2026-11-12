@@ -1,0 +1,264 @@
+Quiero continuar el debugging de mi proyecto Azure Psych V-Slice Engine.
+
+REPO:
+https://github.com/CleverCV/Azure-Psych-VSlice-Engine
+Branch: main
+
+PROYECTO LOCAL:
+C:\Users\radox\HAXE PROYECTS\AzureEngine Psych-Slice
+
+IMPORTANTE:
+- Estoy usando Windows + PowerShell.
+- Quiero que DE AHORA EN ADELANTE me des comandos PowerShell que escriban/modifiquen los archivos automáticamente.
+- No quiero que me digas “abre el archivo y cambia esto”; dame comandos que hagan el cambio.
+- Usa PowerShell compatible con Windows PowerShell 5.1.
+- Para escribir UTF-8 sin BOM usa:
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($path, $content, $utf8NoBom)
+- Verifica Test-Path y errores antes de decir que algo funcionó.
+- No inventes rutas ni resultados.
+
+ESTADO DEL PROYECTO:
+Estoy intentando hacer compatible mi engine con mods de Funkin' V-Slice mediante Polymod.
+
+Haxe libs:
+flixel-addons 4.0.1
+flixel-demos 3.3.0
+flixel-templates 2.7.0
+flixel-tools 1.5.1
+flixel-ui 2.6.5
+flixel 6.2.0
+hscript 2.7.0
+hxcpp 4.3.2
+jsonpatch 1.1.0
+jsonpath 1.1.0
+lime-samples 7.0.0
+lime 8.3.2
+openfl 9.5.2
+polymod 1.8.0
+thx.core 0.44.0
+thx.semver 0.2.2
+
+Project.xml ya tiene:
+<haxelib name="hscript" />
+<haxedef name="hscript" />
+<haxelib name="polymod" />
+
+MOD:
+.\export\windows\bin\mods\FRIDAY NIGHT SYMPHONY
+
+El mod sí está siendo encontrado por Polymod.
+
+POLYMOD:
+Polymod 1.8.0.
+Se corrigió PolymodParserEx.hx porque la versión original no era compatible con HScript 2.7.0.
+
+También se parcheó jsonpath 1.1.0 porque usaba thx.Arrays.containsExact, que no existe en thx.core 0.44.0.
+
+PolymodTest.hx inicializa:
+Polymod.init({
+    modRoot: "mods",
+    dirs: ["FRIDAY NIGHT SYMPHONY"],
+    framework: Framework.LIME,
+    useScriptedClasses: true,
+    loadScriptsAsync: false,
+    errorCallback: ...
+});
+
+Actualmente Polymod encuentra y carga el mod.
+
+LOG MÁS RECIENTE:
+Polymod carga:
+Mods cargados: [mods/FRIDAY NIGHT SYMPHONY]
+
+Y encuentra MUCHOS archivos del mod, incluyendo:
+songs/Billy/Voices-BFMissa2.ogg
+songs/Cancion_china/Voices-Missa_Segundo.ogg
+songs/Beepy_style/voices-MissaCool.ogg
+songs/Cuarentena/Voices-MissaCool.ogg
+etc.
+
+LOS PERSONAJES SÍ FUNCIONAN:
+Ejemplo:
+Character "BFMissa2" cargado desde
+mods/FRIDAY NIGHT SYMPHONY/data/characters/BFMissa2.json
+
+Character "Missa_Billy" cargado desde
+mods/FRIDAY NIGHT SYMPHONY/data/characters/Missa_Billy.json
+
+PROBLEMA ACTUAL:
+Las Voices NO se escuchan.
+
+El log demuestra que VSlicePlayState está generando rutas incorrectas:
+
+Billy:
+Ruta de la Inst: assets/songs/billy/Inst.ogg
+Ruta de las Voces: assets/songs/billy/Voices-BFMissa2.ogg
+
+Cancion_china:
+Ruta de la Inst: assets/songs/cancion_china/Inst.ogg
+Ruta de las Voces: assets/songs/cancion_china/Voices-Missa_Segundo.ogg
+
+Beepy_style:
+Ruta de la Inst: assets/songs/beepy_style/Inst.ogg
+Ruta de las Voces: assets/songs/beepy_style/Voices-MissaCool.ogg
+
+PERO LOS ARCHIVOS REALES ESTÁN EN:
+mods/FRIDAY NIGHT SYMPHONY/songs/...
+
+Por ejemplo:
+mods/FRIDAY NIGHT SYMPHONY/songs/Billy/Voices-BFMissa2.ogg
+
+Así que el problema NO parece ser el OGG ni la reproducción de audio:
+el problema es la resolución de rutas de assets.
+
+Hay una diferencia importante:
+Los personajes ya usan correctamente Polymod:
+mods/FRIDAY NIGHT SYMPHONY/...
+
+Pero VSlicePlayState todavía resuelve las Voices como:
+assets/songs/...
+
+También vimos que otro mod, "fire", logra que el Inst se resuelva como:
+mods/fire/songs/through-the-fire-and-flames/Inst.ogg
+pero sus Voices todavía salen como:
+assets/shared/songs/through-the-fire-and-flames/Voices.ogg
+
+Por lo tanto hay que investigar específicamente cómo VSlicePlayState resuelve Inst/Voices.
+
+ÚLTIMO PASO:
+Necesito revisar source/states/VSlicePlayState.hx alrededor de las líneas 150-230, especialmente donde imprime:
+
+Ruta de la Inst
+Ruta de las Voces
+
+El comando que se iba a ejecutar era:
+
+$ErrorActionPreference = 'Stop'
+
+$path = ".\source\states\VSlicePlayState.hx"
+
+if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw "NO EXISTE: $path"
+}
+
+Get-Content -LiteralPath $path |
+    Select-Object -Skip 150 -First 80
+
+Después de ver ese código hay que modificarlo automáticamente con PowerShell para que la resolución de audio use correctamente Polymod/mods.
+
+OTRO PROBLEMA:
+El BG/stage tampoco está funcionando correctamente.
+
+En pantalla aparece un pequeño iconito de Flixel como asset faltante, justo arriba de la cabeza de Missa Sinfonía.
+
+Creo que el BG tiene el mismo problema de resolución de assets.
+
+El mod contiene stages:
+data/stages/FirstStage.json
+data/stages/Mago.json
+data/stages/MusicaRoom.json
+data/stages/NightmareRoom.json
+data/stages/Cocina.json
+data/stages/FirstStageBlack.json
+data/stages/Barrio.json
+data/stages/FirstStageNeon.json
+data/stages/jpeg.json
+
+Y assets como:
+shared/images/FirstStage/Sala.png
+shared/images/FirstStage/Black.png
+shared/images/FirstStage/light_above.png
+shared/images/MusicaRoom/FONDO.png
+shared/images/MusicaRoom/Setup.png
+shared/images/MusicaRoom/Bateria.png
+shared/images/Cocina/Cocina_fondo.png
+shared/images/Cocina/Cocina_barra.png
+shared/images/Barrio/Barrio.png
+shared/images/Mago/FondoMago.png
+etc.
+
+Así que después de arreglar audio hay que rastrear la resolución del stage/BG.
+
+POLYMOD ERRORS ACTUALES:
+Todavía aparecen errores de imports para:
+funkin.data.stage.StageRegistry
+funkin.play.stage.Stage
+funkin.graphics.FunkinSprite
+funkin.modding.events.ScriptEventDispatcher
+
+Aunque existen stubs en source, Polymod todavía dice que no puede importarlos dentro de:
+SC_ChangeStageEvent.hxc
+SC_StageChanger.hxc
+
+Se registran 20 scripted classes pese a esos errores.
+
+También hay warning:
+missing_icon:
+Could not find mod icon file:
+mods/FRIDAY NIGHT SYMPHONY/_polymod_icon.png
+
+Ese warning NO es la causa principal del audio/BG.
+
+STUBS YA CREADOS:
+source/funkin/data/stage/StageRegistry.hx
+source/funkin/play/stage/Stage.hx
+source/funkin/graphics/FunkinSprite.hx
+source/funkin/modding/events/ScriptEventDispatcher.hx
+
+Y otros compatibility stubs para las clases de V-Slice.
+
+IMPORTANTE SOBRE PLAYSTATEPLAYLIST:
+Se movió:
+source/funkin/PlayStatePlaylist.hx
+a:
+source/funkin/play/PlayStatePlaylist.hx
+
+Package:
+package funkin.play;
+
+PolymodTest.hx debe usar:
+var _forcePlayStatePlaylist:Class<Dynamic> = funkin.play.PlayStatePlaylist;
+
+Ya se corrigió el error nativo anterior causado por:
+funkin.PlayStatePlaylist
+
+POLYMODTEST:
+Tiene force-links para que HScript pueda resolver clases.
+Si aparecen nuevos "Could not import class X", probablemente habrá que añadir force-link o revisar la clase/package.
+
+SC_STAGECHANGER:
+Se parcheó localmente para reemplazar sintaxis HScript que daba EUnexpected con:
+?? 
+?.
+Se reemplazó por ternarios/null checks.
+
+HScript:
+source/funkin/play/HScriptLoader.hx existe.
+El VSlicePlayState ya no depende de HScriptLoader para los chart events; usa el sistema nativo EngineEvent/EventParser/EventDispatcher.
+
+REGLA:
+No reconstruir todo el sistema V-Slice desde cero.
+Adaptar los scripts/mod al engine existente.
+
+SOURCE EXISTENTE:
+source/objects/Character.hx es real y carga personajes desde mods.
+VSlicePlayState usa:
+objects.Character
+objects.Player
+objects.Enemy
+
+No existe originalmente una arquitectura completa de BaseCharacter/Stage V-Slice; los Stage stubs son compatibilidad.
+
+QUIERO QUE SIGAMOS DESDE AQUÍ:
+1. Ver VSlicePlayState.hx alrededor de las líneas 150-230.
+2. Encontrar exactamente cómo construye/resuelve Inst y Voices.
+3. Corregir automáticamente el código para que las voces del mod se encuentren.
+4. Compilar con:
+   Remove-Item -Recurse -Force ".\export\windows\obj" -ErrorAction SilentlyContinue
+   lime test windows
+5. Revisar el log.
+6. Después atacar el iconito del BG y la resolución de stages/assets.
+7. No avanzar a lo siguiente hasta comprobar el resultado del paso anterior.
+
+Y recuerda: quiero comandos PowerShell que escriban los archivos automáticamente.
